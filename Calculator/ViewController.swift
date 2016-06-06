@@ -18,47 +18,29 @@ class ViewController: UIViewController {
    
     @IBAction func clearAll(sender: UIButton) {
         brain.clear()
-        displayValue = brain.result
-        history.text = brain.description
-        isUserInMiddle = false
-        
+        brain.clearVariables()
+        displayValue = nil
     }
   
    
     @IBAction func undo() {
         if isUserInMiddle {
-            backspace()
+            if (display.text!.characters.count == 1) {
+                display.text = "0"
+                isUserInMiddle = false
+            }
+            else {
+                display.text!.removeAtIndex(display.text!.endIndex.predecessor())
+            }
         }
         else {
             brain.undo()
-            savedProgram = brain.program
-            brain.program = savedProgram!
             displayValue = brain.result
         }
 
     }
     @IBAction func backspace() {
-        if (display.text!.characters.count == 1) {
-            display.text = "0"
-            isUserInMiddle = false
-        }
-        else {
-            display.text!.removeAtIndex(display.text!.endIndex.predecessor())
-        }
-
-    }
-    private var savedProgram: CalculatorBrain.PropertyList?
-    
-    @IBAction func save() {
-        savedProgram = brain.program
-    }
-    @IBAction func restore() {
-        if savedProgram != nil {
-            brain.program = savedProgram!
-            displayValue = brain.result
-           isUserInMiddle = false
-            
-        }
+       
     }
     @IBAction func setVariable(sender: UIButton) {
         brain.setOperand(sender.currentTitle!)
@@ -66,11 +48,12 @@ class ViewController: UIViewController {
     }
     
     @IBAction func setVariableValue(sender: UIButton) {
-        brain.variableValues["M"] = displayValue
-        savedProgram = brain.program
-         brain.program = savedProgram!
-         displayValue = brain.result
         isUserInMiddle = false
+        let symbol = String((sender.currentTitle!).characters.dropFirst())
+        if let value = displayValue {
+            brain.setVariable(symbol, variableValue: value)
+            displayValue = brain.result
+        }
     }
     @IBAction private func touchDigit(sender: UIButton) {
         
@@ -94,17 +77,24 @@ class ViewController: UIViewController {
         isUserInMiddle = true
     }
     
-    private var displayValue: Double
+    private var displayValue: Double?
         {
-        get {
-            return Double(display.text!)!
+            get {
+            if let text = display.text,
+                value = formatter.numberFromString(text)?.doubleValue {
+                return value
+            }
+            return nil
         }
         set {
-            let decimalFormater = NSNumberFormatter()
-            decimalFormater.numberStyle = .DecimalStyle
-            decimalFormater.maximumFractionDigits = 6
-            display.text = decimalFormater.stringFromNumber(newValue)!
-            history.text = brain.description + (brain.isPartialResult ? "…" : "=")
+            if let value = newValue {
+                display.text = formatter.stringFromNumber(value)
+                history.text = brain.description + (brain.isPartialResult ? " …" : " =")
+            } else {
+                display.text = "0"
+                history.text = " "
+                isUserInMiddle = false
+            }
         }
         
     }
@@ -114,7 +104,7 @@ class ViewController: UIViewController {
     @IBAction private func performOperation(sender: UIButton) {
         
         if isUserInMiddle {
-            brain.setOperand(displayValue)
+            brain.setOperand(displayValue!)
             isUserInMiddle = false
         }
         

@@ -55,7 +55,7 @@ class CalculatorBrain
     private var currentPrecedence = Int.max
     
     private var operations: Dictionary<String, Operation> = [
-        "M" : Operation.Variable,
+        "rand": Operation.NullaryOperation(drand48,"rand()"),
         "π" : Operation.Constant(M_PI),// M_PI,
         "e" : Operation.Constant(M_E),// M_E,
         "√" : Operation.UnaryOperation(sqrt, { "√(" + $0 + ")" }),// sqrt,
@@ -63,8 +63,8 @@ class CalculatorBrain
         "sin" : Operation.UnaryOperation(sin, { "sin(" + $0 + ")"}),
         "㏑" : Operation.UnaryOperation(log, { "ln(" + $0 + ")"}),
         "∛" : Operation.UnaryOperation(cbrt, { "∛(" + $0 + ")"}),
-        "x²" : Operation.UnaryOperation({pow($0, 2)}, {$0 + "2"}),
-        "x³" : Operation.UnaryOperation({pow($0, 3)}, {$0 + "3"}),
+        "x²" : Operation.UnaryOperation({pow($0, 2)}, {$0 + "²"}),
+        "x³" : Operation.UnaryOperation({pow($0, 3)}, {$0 + "³"}),
         "±" :  Operation.UnaryOperation({-$0},{"-(" + $0 + ")"}),
         "×" : Operation.BinaryOperation( * , { $0 + "*" + $1 }, 1),
         "÷" : Operation.BinaryOperation( /, { $0 + "/" + $1 }, 1),
@@ -83,21 +83,29 @@ class CalculatorBrain
     
     func setOperand(variableName: String) {
         if variableValues[variableName] == nil {
-            variableValues[variableName] = 0.0
+            operations[variableName] = Operation.Variable
         }
+        
         performOperation(variableName)
     }
     
-    var variableValues = [String: Double]() //Dictionary
-    
+    var variableValues = [String: Double]() {
+        didSet {
+            program = internalProgram
+        }
+            
+    }
     
     func performOperation(symbol: String) {
         internalProgram.append(symbol)
         if let operation = operations[symbol] {
             switch operation {
             case .Variable:
-                accumulator = variableValues[symbol]!
-                descriptionAccumulator  = symbol               
+                accumulator = variableValues[symbol] ?? 0.0
+                descriptionAccumulator = symbol
+            case .NullaryOperation(let function, let descriptionFunction):
+                accumulator = function()
+                descriptionAccumulator = descriptionFunction
             case .Constant(let associatedValue):
                 accumulator = associatedValue
                 descriptionAccumulator = symbol
@@ -132,14 +140,22 @@ class CalculatorBrain
                         setOperand(operand)
                     }
                     else if let operation = op as? String {
-                        performOperation(operation)
+                       
+                        if variableValues[operation] != nil {
+                            setOperand(operation)
+                        }
+                        else {
+                             performOperation(operation)
+                        }
                     }
                 }
             }
         }
     }
     func undo() {
+        guard !internalProgram.isEmpty else { return }
         internalProgram.removeLast()
+        program = internalProgram
     }
     func clear()
     {
@@ -147,7 +163,18 @@ class CalculatorBrain
         descriptionAccumulator = " "
         pending = nil
         internalProgram.removeAll()
+        currentPrecedence = Int.max
+    }
+    
+    func clearVariables() {
         variableValues.removeAll()
+    }
+    
+    func getVariable(symbol: String) -> Double? {
+        return variableValues[symbol]
+    }
+    func setVariable(symbol: String, variableValue: Double) {
+         variableValues[symbol] = variableValue
     }
     
     private func pendingBinaryOperation()
@@ -163,6 +190,7 @@ class CalculatorBrain
     
     private enum Operation {
         case Variable
+        case NullaryOperation(()-> Double, String)
         case Constant(Double)
         case UnaryOperation((Double) -> Double, (String) -> String)
         case BinaryOperation((Double, Double) -> Double, (String, String) -> String, Int)
@@ -184,8 +212,15 @@ class CalculatorBrain
         
     }
     
-    
-    
-    
-    
 }
+
+let formatter:NSNumberFormatter = {
+    let formatter = NSNumberFormatter()
+    formatter.numberStyle = .DecimalStyle
+    formatter.maximumFractionDigits = 6
+    formatter.notANumberSymbol = "Error"
+    formatter.groupingSeparator = " "
+    formatter.locale = NSLocale.currentLocale()
+    return formatter
+    
+} ()
