@@ -140,13 +140,7 @@ class CalculatorBrain
                         setOperand(operand)
                     }
                     else if let operation = op as? String {
-                       
-                        if variableValues[operation] != nil {
-                            setOperand(operation)
-                        }
-                        else {
                              performOperation(operation)
-                        }
                     }
                 }
             }
