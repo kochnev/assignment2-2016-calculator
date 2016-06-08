@@ -41,10 +41,12 @@ class CalculatorBrain
             
         }
     }
+    var errorDetails: String?
     
     private var internalProgram = [AnyObject]()
     
     private var accumulator = 0.0
+    
     private var descriptionAccumulator = "0" {
         didSet {
             if pending == nil {
@@ -110,6 +112,7 @@ class CalculatorBrain
                 accumulator = associatedValue
                 descriptionAccumulator = symbol
             case .UnaryOperation(let function, let descriptionFunction):
+                checkErrors(symbol, firstOperand: accumulator, secondOperand: nil)
                 accumulator = function(accumulator)
                 descriptionAccumulator = descriptionFunction(descriptionAccumulator)
             case .BinaryOperation(let function, let descriptionFunction, let precedence):
@@ -118,7 +121,7 @@ class CalculatorBrain
                     descriptionAccumulator = "(" + descriptionAccumulator + ")"
                 }
                 currentPrecedence = precedence
-                pending = PendingBinaryOperationInfo(binaryFunction: function, firstOperand: accumulator, descriptionBinaryFunction: descriptionFunction, descriptionFirstOperand: descriptionAccumulator)
+                pending = PendingBinaryOperationInfo(binaryFunction: function, binaryFunctionSymbol: symbol, firstOperand: accumulator, descriptionBinaryFunction: descriptionFunction, descriptionFirstOperand: descriptionAccumulator)
             case .Equals:
                 pendingBinaryOperation()
             }
@@ -126,6 +129,29 @@ class CalculatorBrain
         }
         
     }
+    
+    private func pendingBinaryOperation()
+    {
+        if pending != nil {
+            checkErrors(pending!.binaryFunctionSymbol, firstOperand: pending!.firstOperand, secondOperand: accumulator)
+            accumulator = pending!.binaryFunction(pending!.firstOperand, accumulator)
+            descriptionAccumulator = pending!.descriptionBinaryFunction(pending!.descriptionFirstOperand, descriptionAccumulator)
+            pending = nil
+        }
+    }
+    
+    func checkErrors(operationName: String, firstOperand: Double, secondOperand: Double?) {
+        if operationName == "√" {
+            if firstOperand<0 { errorDetails = "√ отриц. числа." }
+        }
+        else if operationName == "㏑" {
+            if firstOperand<0 { errorDetails = "ln отриц. числа" }
+        }
+        else if operationName == "÷" {
+            if secondOperand! == 0 { errorDetails = "деление на ноль" }
+        }
+    }
+    
     
     typealias PropertyList = AnyObject
     var program: PropertyList
@@ -159,6 +185,7 @@ class CalculatorBrain
         pending = nil
         internalProgram.removeAll()
         currentPrecedence = Int.max
+        errorDetails = nil
     }
     
     func clearVariables() {
@@ -172,14 +199,7 @@ class CalculatorBrain
          variableValues[symbol] = variableValue
     }
     
-    private func pendingBinaryOperation()
-    {
-        if pending != nil {
-            accumulator = pending!.binaryFunction(pending!.firstOperand, accumulator)
-            descriptionAccumulator = pending!.descriptionBinaryFunction(pending!.descriptionFirstOperand, descriptionAccumulator)
-            pending = nil
-        }
-    }
+   
     
     private var pending: PendingBinaryOperationInfo?
     
@@ -195,14 +215,15 @@ class CalculatorBrain
     
     private struct PendingBinaryOperationInfo {
         var binaryFunction: (Double, Double) -> Double
+        var binaryFunctionSymbol: String
         var firstOperand: Double
         var descriptionBinaryFunction: (String, String) -> String
         var descriptionFirstOperand: String
     }
     
-    var result: Double {
+    var result: (Double) {
         get {
-            return accumulator
+            return (accumulator)
         }
         
     }

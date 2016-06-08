@@ -112,7 +112,12 @@ class ViewController: UIViewController {
             brain.performOperation(mathematicalSymbol)
         }
         
-        displayValue = brain.result
+        if(brain.errorDetails != nil) {
+             display.text = brain.errorDetails!
+        }
+        else {
+           displayValue = brain.result
+        }
         
     }
     
