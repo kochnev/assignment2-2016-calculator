@@ -134,6 +134,7 @@ class CalculatorBrain
             return internalProgram
         }
         set {
+            clear()
             if let arrayOfOps = newValue as?[AnyObject] {
                 for op in arrayOfOps {
                     if let operand = op as? Double {
