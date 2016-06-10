@@ -35,7 +35,7 @@ class ViewController: UIViewController {
         }
         else {
             brain.undo()
-            displayValue = brain.result
+            resultValue = brain.result
         }
 
     }
@@ -44,7 +44,7 @@ class ViewController: UIViewController {
     }
     @IBAction func setVariable(sender: UIButton) {
         brain.setOperand(sender.currentTitle!)
-        displayValue = brain.result
+        resultValue = brain.result
     }
     
     @IBAction func setVariableValue(sender: UIButton) {
@@ -52,7 +52,7 @@ class ViewController: UIViewController {
         let symbol = String((sender.currentTitle!).characters.dropFirst())
         if let value = displayValue {
             brain.setVariable(symbol, variableValue: value)
-            displayValue = brain.result
+            resultValue = brain.result
         }
     }
     @IBAction private func touchDigit(sender: UIButton) {
@@ -101,6 +101,19 @@ class ViewController: UIViewController {
     
     private var brain = CalculatorBrain()
     
+    private var resultValue: (Double, String?) = (0.0 , nil) {
+        didSet {
+            switch resultValue {
+            case (_, nil): displayValue = resultValue.0
+            case (_, let error):
+                display.text = error
+                history.text = brain.description + (brain.isPartialResult ? " …" : " =")
+                isUserInMiddle = false
+            }
+            
+        }
+    }
+    
     @IBAction private func performOperation(sender: UIButton) {
         
         if isUserInMiddle {
@@ -112,12 +125,8 @@ class ViewController: UIViewController {
             brain.performOperation(mathematicalSymbol)
         }
         
-        if(brain.errorDetails != nil) {
-             display.text = brain.errorDetails!
-        }
-        else {
-           displayValue = brain.result
-        }
+        resultValue = brain.result
+       
         
     }
     

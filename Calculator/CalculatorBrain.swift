@@ -41,7 +41,7 @@ class CalculatorBrain
             
         }
     }
-    var errorDetails: String?
+    private var errorDetails: String?
     
     private var internalProgram = [AnyObject]()
     
@@ -60,18 +60,18 @@ class CalculatorBrain
         "rand": Operation.NullaryOperation(drand48,"rand()"),
         "π" : Operation.Constant(M_PI),// M_PI,
         "e" : Operation.Constant(M_E),// M_E,
-        "√" : Operation.UnaryOperation(sqrt, { "√(" + $0 + ")" }),// sqrt,
-        "cos" : Operation.UnaryOperation(cos, { "cos(" + $0 + ")"}),// cos
-        "sin" : Operation.UnaryOperation(sin, { "sin(" + $0 + ")"}),
-        "㏑" : Operation.UnaryOperation(log, { "ln(" + $0 + ")"}),
-        "∛" : Operation.UnaryOperation(cbrt, { "∛(" + $0 + ")"}),
-        "x²" : Operation.UnaryOperation({pow($0, 2)}, {$0 + "²"}),
-        "x³" : Operation.UnaryOperation({pow($0, 3)}, {$0 + "³"}),
-        "±" :  Operation.UnaryOperation({-$0},{"-(" + $0 + ")"}),
-        "×" : Operation.BinaryOperation( * , { $0 + "*" + $1 }, 1),
-        "÷" : Operation.BinaryOperation( /, { $0 + "/" + $1 }, 1),
-        "+" : Operation.BinaryOperation( +, { $0 + "+" + $1 }, 0),
-        "−" : Operation.BinaryOperation( -, { $0 + "-" + $1 }, 0),
+        "√" : Operation.UnaryOperation(sqrt, { "√(" + $0 + ")" }, { $0<0 ? "√ отриц. чисал" : nil}),// sqrt,
+        "cos" : Operation.UnaryOperation(cos, { "cos(" + $0 + ")"}, nil),// cos
+        "sin" : Operation.UnaryOperation(sin, { "sin(" + $0 + ")"}, nil),
+        "㏑" : Operation.UnaryOperation(log, { "ln(" + $0 + ")"},{ $0<0 ? "ln отриц. чисал" : nil}),
+        "∛" : Operation.UnaryOperation(cbrt, { "∛(" + $0 + ")"}, nil),
+        "x²" : Operation.UnaryOperation({pow($0, 2)}, {$0 + "²"}, nil),
+        "x³" : Operation.UnaryOperation({pow($0, 3)}, {$0 + "³"}, nil),
+        "±" :  Operation.UnaryOperation({-$0},{"-(" + $0 + ")"}, nil),
+        "×" : Operation.BinaryOperation( * , { $0 + "*" + $1 }, 1, nil),
+        "÷" : Operation.BinaryOperation( /, { $0 + "/" + $1 }, 1, { $1==0 ? "деление на ноль" : nil}),
+        "+" : Operation.BinaryOperation( +, { $0 + "+" + $1 }, 0, nil),
+        "−" : Operation.BinaryOperation( -, { $0 + "-" + $1 }, 0, nil),
         "=" : Operation.Equals
     ]
     
@@ -111,17 +111,18 @@ class CalculatorBrain
             case .Constant(let associatedValue):
                 accumulator = associatedValue
                 descriptionAccumulator = symbol
-            case .UnaryOperation(let function, let descriptionFunction):
-                checkErrors(symbol, firstOperand: accumulator, secondOperand: nil)
+            case .UnaryOperation(let function, let descriptionFunction, let validator):
+                errorDetails = validator?(accumulator)
                 accumulator = function(accumulator)
                 descriptionAccumulator = descriptionFunction(descriptionAccumulator)
-            case .BinaryOperation(let function, let descriptionFunction, let precedence):
+            case .BinaryOperation(let function, let descriptionFunction, let precedence, let validator):
                 pendingBinaryOperation()
                 if currentPrecedence<precedence {
                     descriptionAccumulator = "(" + descriptionAccumulator + ")"
                 }
                 currentPrecedence = precedence
-                pending = PendingBinaryOperationInfo(binaryFunction: function, binaryFunctionSymbol: symbol, firstOperand: accumulator, descriptionBinaryFunction: descriptionFunction, descriptionFirstOperand: descriptionAccumulator)
+                pending = PendingBinaryOperationInfo(binaryFunction: function, firstOperand: accumulator, descriptionBinaryFunction: descriptionFunction, descriptionFirstOperand: descriptionAccumulator,
+                    validator: validator)
             case .Equals:
                 pendingBinaryOperation()
             }
@@ -133,24 +134,14 @@ class CalculatorBrain
     private func pendingBinaryOperation()
     {
         if pending != nil {
-            checkErrors(pending!.binaryFunctionSymbol, firstOperand: pending!.firstOperand, secondOperand: accumulator)
+            errorDetails = pending!.validator?(pending!.firstOperand, accumulator)
             accumulator = pending!.binaryFunction(pending!.firstOperand, accumulator)
             descriptionAccumulator = pending!.descriptionBinaryFunction(pending!.descriptionFirstOperand, descriptionAccumulator)
             pending = nil
         }
     }
     
-    func checkErrors(operationName: String, firstOperand: Double, secondOperand: Double?) {
-        if operationName == "√" {
-            if firstOperand<0 { errorDetails = "√ отриц. числа." }
-        }
-        else if operationName == "㏑" {
-            if firstOperand<0 { errorDetails = "ln отриц. числа" }
-        }
-        else if operationName == "÷" {
-            if secondOperand! == 0 { errorDetails = "деление на ноль" }
-        }
-    }
+  
     
     
     typealias PropertyList = AnyObject
@@ -207,23 +198,23 @@ class CalculatorBrain
         case Variable
         case NullaryOperation(()-> Double, String)
         case Constant(Double)
-        case UnaryOperation((Double) -> Double, (String) -> String)
-        case BinaryOperation((Double, Double) -> Double, (String, String) -> String, Int)
+        case UnaryOperation((Double) -> Double, (String) -> String, ((Double) -> String?)?)
+        case BinaryOperation((Double, Double) -> Double, (String, String) -> String, Int, ((Double, Double) -> String?)? )
         case Equals
         
     }
     
     private struct PendingBinaryOperationInfo {
         var binaryFunction: (Double, Double) -> Double
-        var binaryFunctionSymbol: String
         var firstOperand: Double
         var descriptionBinaryFunction: (String, String) -> String
         var descriptionFirstOperand: String
+        var validator: ((Double, Double) -> String?)?
     }
     
-    var result: (Double) {
+    var result: (Double, String?) {
         get {
-            return (accumulator)
+            return (accumulator, errorDetails)
         }
         
     }
